@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Agenda Kegiatan Dinas</title>
+    
+    <!-- Tailwind CSS untuk gaya -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FullCalendar JS dan CSS untuk tampilan kalender -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    
+    <!-- Lucide Icons untuk ikon modern -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Gaya kustom untuk memastikan tampilan dan nuansa yang baik */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        /* Gaya untuk header FullCalendar */
+        .fc-header-toolbar {
+            padding: 1rem 0.5rem;
+            font-size: 0.9rem;
+        }
+        .fc-button {
+            background-color: #4f46e5 !important; /* indigo-600 */
+            border-color: #4f46e5 !important;
+            text-transform: capitalize;
+        }
+        .fc-button:hover {
+            background-color: #4338ca !important; /* indigo-700 */
+        }
+        /* Gaya untuk tampilan bulan/minggu yang lebih bersih */
+        .fc-daygrid-event {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .fc-event-time {
+            font-weight: 600;
+            margin-right: 4px;
+        }
+        .fc-daygrid-day.fc-day-today {
+            background-color: #eef2ff !important; /* indigo-50 */
+        }
+        .fc-daygrid-more-link {
+            font-weight: 600;
+            color: #4f46e5;
+        }
+        /* Gaya untuk tampilan daftar */
+        .fc-list-event:hover td {
+            background-color: #f8fafc !important; /* slate-50 */
+        }
+        .fc-list-event-title a {
+            color: #1e293b; /* slate-800 */
+            font-weight: 600;
+        }
+        /* Gaya untuk modal */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(3px);
+            z-index: 40;
+        }
+        .modal-content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <!-- Kontainer Utama -->
+    <div class="container mx-auto p-4 md:p-6">
+        
+        <!-- Header -->
+        <header class="bg-white p-6 rounded-xl shadow-sm mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900">Agenda Kegiatan Dinas</h1>
+                    <p class="text-slate-500 mt-1">Pusat informasi jadwal kegiatan internal dan undangan eksternal.</p>
+                </div>
+                <button id="addAgendaBtn" class="flex items-center gap-2 bg-indigo-600 text-white font-semibold px-5 py-2.5 rounded-lg shadow-sm hover:bg-indigo-700 transition-colors mt-4 md:mt-0">
+                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                    <span>Tambah Agenda</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Kontrol dan Kalender -->
+        <div class="bg-white p-4 md:p-6 rounded-xl shadow-sm">
+            <!-- Filter -->
+            <div class="flex flex-wrap justify-start items-center gap-4 mb-6 pb-4 border-b border-slate-200">
+                <label for="adminFilter" class="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <i data-lucide="filter" class="w-4 h-4 text-slate-500"></i>
+                    <span>Tampilkan Agenda dari:</span>
+                </label>
+                <select id="adminFilter" class="block w-full md:w-60 px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="all">Semua</option>
+                    <option value="Admin Dinas">Admin Dinas</option>
+                    <option value="Admin Sekretariat">Admin Sekretariat</option>
+                    <option value="Admin Bidang Aptika">Admin Bidang Aptika</option>
+                    <option value="Admin Bidang Santis">Admin Bidang Santis</option>
+                    <option value="Admin Bidang IP">Admin Bidang IP</option>
+                    <option value="Admin Bidang KP">Admin Bidang KP</option>
+                </select>
+            </div>
+
+            <!-- Tampilan Kalender -->
+            <main>
+                <div id='calendar'></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal untuk Menambah/Mengedit Agenda -->
+    <div id="agendaModal" class="hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content bg-white w-11/12 md:w-2/3 max-w-3xl rounded-lg shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b">
+                <h2 id="modalTitle" class="text-2xl font-bold">Tambah Agenda Baru</h2>
+            </div>
+            <form id="agendaForm">
+                <input type="hidden" id="eventId">
+                <div class="p-6 space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Jenis Agenda -->
+                        <div class="md:col-span-2">
+                            <label for="jenisAgenda" class="block text-sm font-medium text-slate-700">Jenis Agenda</label>
+                            <select id="jenisAgenda" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <option value="Eksternal">Eksternal (Undangan)</option>
+                                <option value="Internal">Internal</option>
+                            </select>
+                        </div>
+                        <!-- Perihal -->
+                        <div class="md:col-span-2">
+                            <label for="perihal" class="block text-sm font-medium text-slate-700">Perihal Kegiatan</label>
+                            <input type="text" id="perihal" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                        </div>
+                        <!-- Waktu Mulai -->
+                        <div>
+                            <label for="waktuMulai" class="block text-sm font-medium text-slate-700">Waktu Pelaksanaan Mulai</label>
+                            <input type="datetime-local" id="waktuMulai" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                        </div>
+                        <!-- Waktu Selesai -->
+                        <div>
+                            <label for="waktuSelesai" class="block text-sm font-medium text-slate-700">Waktu Pelaksanaan Selesai</label>
+                            <input type="datetime-local" id="waktuSelesai" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                        </div>
+                        <!-- Tempat -->
+                        <div class="md:col-span-2">
+                            <label for="tempat" class="block text-sm font-medium text-slate-700">Tempat</label>
+                            <input type="text" id="tempat" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Kolom Khusus Eksternal -->
+                    <div id="eksternalFields" class="space-y-4 border-t pt-4">
+                        <h3 class="text-lg font-semibold text-slate-800">Detail Agenda Eksternal</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Asal Surat -->
+                            <div>
+                                <label for="asalSurat" class="block text-sm font-medium text-slate-700">Asal Surat / Penyelenggara</label>
+                                <input type="text" id="asalSurat" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <!-- Pakaian -->
+                            <div>
+                                <label for="pakaian" class="block text-sm font-medium text-slate-700">Pakaian</label>
+                                <input type="text" id="pakaian" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Contoh: Batik, PDH">
+                            </div>
+                             <!-- Disposisi -->
+                            <div class="md:col-span-2">
+                                <label for="disposisi" class="block text-sm font-medium text-slate-700">Disposisi</label>
+                                <textarea id="disposisi" rows="2" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Contoh: Mohon dihadiri dan dilaporkan hasilnya."></textarea>
+                            </div>
+                            <!-- Petugas yang Ditugaskan -->
+                            <div class="md:col-span-2">
+                                <label for="petugas" class="block text-sm font-medium text-slate-700">Petugas yang Ditugaskan (pisahkan dengan koma)</label>
+                                <input type="text" id="petugas" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Contoh: Budi, Ani, Kepala Dinas">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kolom Khusus Internal -->
+                     <div id="internalFields" class="space-y-4 border-t pt-4">
+                        <h3 class="text-lg font-semibold text-slate-800">Opsi Agenda Internal</h3>
+                         <!-- Publikasi Website -->
+                        <div class="flex items-center mt-2">
+                            <input type="checkbox" id="publishWebsite" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            <label for="publishWebsite" class="ml-2 block text-sm text-gray-900">Publikasikan agenda ini di website dinas</label>
+                        </div>
+                    </div>
+                    
+                    <!-- Kolom Umum -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                        <!-- Status -->
+                        <div>
+                            <label for="status" class="block text-sm font-medium text-slate-700">Status</label>
+                            <select id="status" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <option>Terjadwal</option>
+                                <option>Selesai</option>
+                                <option>Dibatalkan</option>
+                            </select>
+                        </div>
+                        <!-- Diinput oleh -->
+                        <div>
+                            <label for="createdBy" class="block text-sm font-medium text-slate-700">Diinput oleh</label>
+                            <select id="createdBy" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <!-- Opsi diisi oleh JS -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <!-- Tombol Aksi Form -->
+                <div class="p-6 bg-slate-50 rounded-b-lg flex justify-end gap-3">
+                    <button type="button" id="cancelBtn" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 font-semibold">Batal</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700">Simpan Agenda</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal untuk Melihat Detail -->
+    <div id="detailModal" class="hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content bg-white w-11/12 md:w-1/2 max-w-2xl rounded-lg shadow-xl max-h-[90vh] overflow-y-auto">
+             <div class="p-6 border-b flex justify-between items-start">
+                <div>
+                    <h2 id="detailTitle" class="text-2xl font-bold text-slate-900"></h2>
+                    <p id="detailCreatedBy" class="text-sm text-slate-500 mt-1"></p>
+                </div>
+                <button id="closeDetailBtn" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <div id="detailContent" class="p-6 space-y-4">
+                <!-- Konten detail akan dimasukkan di sini oleh JS -->
+            </div>
+            <div class="p-6 bg-slate-50 rounded-b-lg flex justify-end gap-3">
+                <button type="button" id="deleteBtn" class="px-4 py-2 bg-red-100 text-red-700 font-semibold rounded-lg hover:bg-red-200 flex items-center gap-2"><i data-lucide="trash-2" class="w-4 h-4"></i>Hapus</button>
+                <button type="button" id="editBtn" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-sm hover:bg-indigo-700 flex items-center gap-2"><i data-lucide="edit" class="w-4 h-4"></i>Edit</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal Konfirmasi Kustom -->
+    <div id="confirmModal" class="hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content bg-white w-11/12 max-w-sm rounded-lg shadow-xl p-6 text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                <i data-lucide="alert-triangle" class="h-6 w-6 text-red-600"></i>
+            </div>
+            <h3 class="text-lg font-medium text-slate-900 mt-4">Hapus Agenda?</h3>
+            <p class="text-sm text-slate-500 mt-2">Apakah Anda yakin ingin menghapus agenda ini? Tindakan ini tidak dapat dibatalkan.</p>
+            <div class="mt-6 flex justify-center gap-3">
+                <button id="confirmCancelBtn" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 w-24 font-semibold">Batal</button>
+                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-sm hover:bg-red-700 w-24">Hapus</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- SIMULASI DATA ---
+            let allAgendaData = [
+                {
+                    id: '1',
+                    title: 'Rapat Internal Bidang Aptika',
+                    start: '2025-07-28T10:00:00',
+                    end: '2025-07-28T12:00:00',
+                    extendedProps: {
+                        jenisAgenda: 'Internal',
+                        tempat: 'Ruang Rapat Aptika',
+                        status: 'Terjadwal',
+                        createdBy: 'Admin Bidang Aptika',
+                        publishWebsite: true,
+                        asalSurat: '', pakaian: '', disposisi: '', petugas: ''
+                    }
+                },
+                {
+                    id: '2',
+                    title: 'Undangan Workshop Smart City',
+                    start: '2025-07-30T09:00:00',
+                    end: '2025-07-31T17:00:00',
+                    extendedProps: {
+                        jenisAgenda: 'Eksternal',
+                        asalSurat: 'Kementerian Kominfo',
+                        tempat: 'Hotel Aston, Pontianak',
+                        pakaian: 'Batik',
+                        disposisi: 'Kadis harap hadir, Kabid Aptika mendampingi.',
+                        petugas: 'Kepala Dinas, Kabid Aptika',
+                        status: 'Terjadwal',
+                        createdBy: 'Admin Dinas',
+                        publishWebsite: false
+                    }
+                },
+                {
+                    id: '3',
+                    title: 'Apel Pagi Gabungan',
+                    start: '2025-08-04T07:30:00',
+                    end: '2025-08-04T08:30:00',
+                    extendedProps: {
+                        jenisAgenda: 'Internal',
+                        tempat: 'Halaman Kantor',
+                        status: 'Terjadwal',
+                        createdBy: 'Admin Sekretariat',
+                        publishWebsite: false,
+                        asalSurat: '', pakaian: '', disposisi: '', petugas: ''
+                    }
+                }
+            ];
+            
+            // Tetapkan warna saat pemuatan awal
+            allAgendaData.forEach(event => {
+                const colors = getColorForAdmin(event.extendedProps.createdBy, event.extendedProps.status);
+                event.backgroundColor = colors.backgroundColor;
+                event.borderColor = colors.borderColor;
+            });
+
+
+            // --- SELEKTOR ELEMEN UI ---
+            const calendarEl = document.getElementById('calendar');
+            const agendaModal = document.getElementById('agendaModal');
+            const detailModal = document.getElementById('detailModal');
+            const confirmModal = document.getElementById('confirmModal');
+            const addAgendaBtn = document.getElementById('addAgendaBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const closeDetailBtn = document.getElementById('closeDetailBtn');
+            const agendaForm = document.getElementById('agendaForm');
+            const modalTitle = document.getElementById('modalTitle');
+            const adminFilter = document.getElementById('adminFilter');
+            const jenisAgendaSelect = document.getElementById('jenisAgenda');
+            const createdBySelect = document.getElementById('createdBy');
+            const eksternalFieldsContainer = document.getElementById('eksternalFields');
+            const internalFieldsContainer = document.getElementById('internalFields');
+
+            // --- INISIALISASI FULLCALENDAR ---
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'id',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,listWeek'
+                },
+                buttonText: {
+                    today: 'hari ini',
+                    month: 'bulanan',
+                    week: 'mingguan',
+                    list: 'daftar'
+                },
+                events: allAgendaData,
+                noEventsText: 'Tidak ada agenda untuk ditampilkan',
+                dayMaxEvents: 2,
+                eventClick: function(info) {
+                    showDetailModal(info.event);
+                },
+                dateClick: function(info) {
+                    openAddModal(info.dateStr);
+                },
+                eventContent: function(arg) {
+                    let publishIcon = arg.event.extendedProps.publishWebsite ? `<i data-lucide="globe" class="w-3 h-3 ml-1 text-blue-600"></i>` : '';
+                    let html = `<div class="fc-event-main-frame flex items-center"><div class="fc-event-time">${arg.timeText}</div><div class="fc-event-title-container"><div class="fc-event-title fc-sticky">${arg.event.title}</div></div>${publishIcon}</div>`;
+                    return { html: html };
+                },
+                eventDidMount: function(info) {
+                    lucide.createIcons();
+                }
+            });
+            calendar.render();
+            lucide.createIcons();
+
+            // --- FUNGSI PENGELOLAAN FORM DINAMIS ---
+            const adminOptions = {
+                'Eksternal': ['Admin Dinas'],
+                'Internal': ['Admin Sekretariat', 'Admin Bidang Aptika', 'Admin Bidang Santis', 'Admin Bidang IP', 'Admin Bidang KP']
+            };
+
+            function updateFormBasedOnJenisAgenda() {
+                const selectedJenis = jenisAgendaSelect.value;
+                
+                if (selectedJenis === 'Eksternal') {
+                    eksternalFieldsContainer.style.display = 'block';
+                    internalFieldsContainer.style.display = 'none';
+                } else {
+                    eksternalFieldsContainer.style.display = 'none';
+                    internalFieldsContainer.style.display = 'block';
+                }
+
+                createdBySelect.innerHTML = '';
+                adminOptions[selectedJenis].forEach(optionText => {
+                    const option = document.createElement('option');
+                    option.value = optionText;
+                    option.textContent = optionText;
+                    createdBySelect.appendChild(option);
+                });
+            }
+
+            // --- FUNGSI MODAL ---
+            function openAddModal(date = null) {
+                agendaForm.reset();
+                document.getElementById('eventId').value = '';
+                modalTitle.innerText = 'Tambah Agenda Baru';
+                jenisAgendaSelect.value = 'Eksternal';
+                updateFormBasedOnJenisAgenda();
+                if (date) {
+                    document.getElementById('waktuMulai').value = `${date}T09:00`;
+                    document.getElementById('waktuSelesai').value = `${date}T10:00`;
+                }
+                agendaModal.classList.remove('hidden');
+            }
+
+            function closeModal() {
+                agendaModal.classList.add('hidden');
+            }
+            
+            function showDetailModal(event) {
+                const props = event.extendedProps;
+                document.getElementById('detailTitle').innerText = event.title;
+                
+                const createdByEl = document.getElementById('detailCreatedBy');
+                createdByEl.innerHTML = `Diinput oleh <span class="font-semibold" style="color:${event.backgroundColor};">${props.createdBy}</span>`;
+
+
+                let detailHtml = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-start gap-3">
+                            <i data-lucide="calendar" class="w-5 h-5 text-slate-500 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-slate-800">Waktu Pelaksanaan</h4>
+                                <p class="text-slate-600">${formatDateRange(event.start, event.end)}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <i data-lucide="map-pin" class="w-5 h-5 text-slate-500 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-slate-800">Tempat</h4>
+                                <p class="text-slate-600">${props.tempat || '-'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                if (props.jenisAgenda === 'Eksternal') {
+                    detailHtml += `
+                        <div class="border-t my-4"></div>
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-3">
+                                <i data-lucide="building" class="w-5 h-5 text-slate-500 mt-1"></i>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800">Asal Surat / Penyelenggara</h4>
+                                    <p class="text-slate-600">${props.asalSurat || '-'}</p>
+                                </div>
+                            </div>
+                             <div class="flex items-start gap-3">
+                                <i data-lucide="shirt" class="w-5 h-5 text-slate-500 mt-1"></i>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800">Pakaian</h4>
+                                    <p class="text-slate-600">${props.pakaian || '-'}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i data-lucide="file-text" class="w-5 h-5 text-slate-500 mt-1"></i>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800">Disposisi</h4>
+                                    <p class="text-slate-600">${props.disposisi || '-'}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-3">
+                                <i data-lucide="users" class="w-5 h-5 text-slate-500 mt-1"></i>
+                                <div>
+                                    <h4 class="font-semibold text-slate-800">Petugas yang Ditugaskan</h4>
+                                    <p class="text-slate-600">${props.petugas || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                const publishText = props.publishWebsite ? 'Ya, dipublikasikan' : 'Tidak dipublikasikan';
+                
+                if (props.jenisAgenda === 'Internal') {
+                    detailHtml += `
+                        <div class="border-t my-4"></div>
+                        <div class="flex items-start gap-3">
+                            <i data-lucide="globe" class="w-5 h-5 text-slate-500 mt-1"></i>
+                            <div>
+                                <h4 class="font-semibold text-slate-800">Publikasi Website</h4>
+                                <p class="flex items-center gap-2 text-slate-600">${publishText}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+
+
+                document.getElementById('detailContent').innerHTML = detailHtml;
+                lucide.createIcons();
+                
+                document.getElementById('editBtn').dataset.eventId = event.id;
+                document.getElementById('deleteBtn').dataset.eventId = event.id;
+
+                detailModal.classList.remove('hidden');
+            }
+
+            function closeDetailModal() {
+                detailModal.classList.add('hidden');
+            }
+
+            // --- EVENT LISTENER ---
+            jenisAgendaSelect.addEventListener('change', updateFormBasedOnJenisAgenda);
+            addAgendaBtn.addEventListener('click', () => openAddModal());
+            cancelBtn.addEventListener('click', closeModal);
+            closeDetailBtn.addEventListener('click', closeDetailModal);
+            agendaModal.querySelector('.modal-backdrop').addEventListener('click', closeModal);
+            detailModal.querySelector('.modal-backdrop').addEventListener('click', closeDetailModal);
+            confirmModal.querySelector('.modal-backdrop').addEventListener('click', () => confirmModal.classList.add('hidden'));
+
+            agendaForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const eventId = document.getElementById('eventId').value;
+                const createdBy = document.getElementById('createdBy').value;
+                const status = document.getElementById('status').value;
+                const jenisAgenda = document.getElementById('jenisAgenda').value;
+                const colors = getColorForAdmin(createdBy, status);
+
+                const newEventData = {
+                    title: document.getElementById('perihal').value,
+                    start: document.getElementById('waktuMulai').value,
+                    end: document.getElementById('waktuSelesai').value,
+                    extendedProps: {
+                        jenisAgenda: jenisAgenda,
+                        tempat: document.getElementById('tempat').value,
+                        status: status,
+                        createdBy: createdBy,
+                        publishWebsite: jenisAgenda === 'Internal' ? document.getElementById('publishWebsite').checked : false,
+                        asalSurat: jenisAgenda === 'Eksternal' ? document.getElementById('asalSurat').value : '',
+                        pakaian: jenisAgenda === 'Eksternal' ? document.getElementById('pakaian').value : '',
+                        disposisi: jenisAgenda === 'Eksternal' ? document.getElementById('disposisi').value : '',
+                        petugas: jenisAgenda === 'Eksternal' ? document.getElementById('petugas').value : ''
+                    },
+                    backgroundColor: colors.backgroundColor,
+                    borderColor: colors.borderColor,
+                };
+
+                if (eventId) {
+                    const index = allAgendaData.findIndex(event => event.id === eventId);
+                    if (index !== -1) {
+                        allAgendaData[index] = { ...allAgendaData[index], ...newEventData };
+                    }
+                } else {
+                    newEventData.id = Date.now().toString();
+                    allAgendaData.push(newEventData);
+                }
+                
+                filterEvents();
+                closeModal();
+            });
+            
+            document.getElementById('editBtn').addEventListener('click', function() {
+                const eventId = this.dataset.eventId;
+                const eventData = allAgendaData.find(e => e.id === eventId);
+                if (!eventData) return;
+
+                closeDetailModal();
+                
+                modalTitle.innerText = 'Edit Agenda';
+                document.getElementById('eventId').value = eventData.id;
+                
+                jenisAgendaSelect.value = eventData.extendedProps.jenisAgenda;
+                updateFormBasedOnJenisAgenda();
+
+                document.getElementById('perihal').value = eventData.title;
+                document.getElementById('waktuMulai').value = eventData.start.substring(0, 16);
+                document.getElementById('waktuSelesai').value = eventData.end ? eventData.end.substring(0, 16) : '';
+                document.getElementById('tempat').value = eventData.extendedProps.tempat;
+                document.getElementById('status').value = eventData.extendedProps.status;
+                document.getElementById('createdBy').value = eventData.extendedProps.createdBy;
+
+                if (eventData.extendedProps.jenisAgenda === 'Eksternal') {
+                    document.getElementById('asalSurat').value = eventData.extendedProps.asalSurat;
+                    document.getElementById('pakaian').value = eventData.extendedProps.pakaian;
+                    document.getElementById('disposisi').value = eventData.extendedProps.disposisi;
+                    document.getElementById('petugas').value = eventData.extendedProps.petugas;
+                } else { // Internal
+                     document.getElementById('publishWebsite').checked = eventData.extendedProps.publishWebsite;
+                }
+                
+                agendaModal.classList.remove('hidden');
+            });
+
+            document.getElementById('deleteBtn').addEventListener('click', function() {
+                const eventId = this.dataset.eventId;
+                confirmModal.classList.remove('hidden');
+                document.getElementById('confirmDeleteBtn').dataset.eventId = eventId;
+            });
+
+            document.getElementById('confirmCancelBtn').addEventListener('click', () => {
+                confirmModal.classList.add('hidden');
+            });
+
+            document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+                const eventId = this.dataset.eventId;
+                allAgendaData = allAgendaData.filter(e => e.id !== eventId);
+                filterEvents();
+                closeDetailModal();
+                confirmModal.classList.add('hidden');
+});
+
+            adminFilter.addEventListener('change', filterEvents);
+
+            function filterEvents() {
+                const selectedAdmin = adminFilter.value;
+                let filteredEvents;
+
+                if (selectedAdmin === 'all') {
+                    filteredEvents = allAgendaData;
+                } else {
+                    filteredEvents = allAgendaData.filter(event => event.extendedProps.createdBy === selectedAdmin);
+                }
+                
+                calendar.removeAllEvents();
+                calendar.addEventSource(filteredEvents);
+            }
+
+            // --- FUNGSI BANTU ---
+            function getColorForAdmin(createdBy, status) {
+                if (status !== 'Terjadwal') {
+                    return { backgroundColor: '#6b7280', borderColor: '#6b7280' }; // Abu-abu untuk Selesai/Dibatalkan
+                }
+                switch (createdBy) {
+                    case 'Admin Dinas':         return { backgroundColor: '#ef4444', borderColor: '#ef4444' }; // red-500
+                    case 'Admin Sekretariat':   return { backgroundColor: '#f97316', borderColor: '#f97316' }; // orange-500
+                    case 'Admin Bidang Aptika': return { backgroundColor: '#22c55e', borderColor: '#22c55e' }; // green-500
+                    case 'Admin Bidang Santis': return { backgroundColor: '#3b82f6', borderColor: '#3b82f6' }; // blue-500
+                    case 'Admin Bidang IP':     return { backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }; // violet-500
+                    case 'Admin Bidang KP':     return { backgroundColor: '#ec4899', borderColor: '#ec4899' }; // pink-500
+                    default:                    return { backgroundColor: '#78716c', borderColor: '#78716c' }; // stone-500
+                }
+            }
+
+            function formatDateRange(start, end) {
+                const options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+                const startDate = new Date(start);
+                if (!end) return startDate.toLocaleDateString('id-ID', options);
+                const endDate = new Date(end);
+                if (startDate.toDateString() === endDate.toDateString()) {
+                    return `${startDate.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} | ${startDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+                } else {
+                    return `${startDate.toLocaleDateString('id-ID', options)} s/d ${endDate.toLocaleDateString('id-ID', options)}`;
+                }
+            }
+
+            function getStatusColorClass(status) {
+                switch(status) {
+                    case 'Selesai': return 'bg-gray-100 text-gray-800';
+                    case 'Dibatalkan': return 'bg-red-100 text-red-800';
+                    case 'Terjadwal': default: return 'bg-yellow-100 text-yellow-800';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
